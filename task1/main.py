@@ -79,6 +79,7 @@ class XmlConverter(Converter):
 
 class Action:
     """Class for working with input data."""
+
     def __init__(self, students: list, rooms: list):
         self.students = students
         self.rooms = rooms
@@ -101,14 +102,24 @@ class Action:
         return self.rooms
 
 
-def make(stud_path, rooms_path, mode):
+class ConverterFactory:
+    """Factory class for defining output format"""
+
+    def get_serializer(self, format, data):
+        if format == 'json':
+            return JsonConverter(data)
+        elif format == 'xml':
+            return XmlConverter(data)
+        else:
+            raise ValueError(format)
+
+
+def make(stud_path, rooms_path, format):
+    converter = ConverterFactory()
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
     data = Action(students, rooms).union()
-    if mode == 'json':
-        JsonConverter(data).save()
-    if mode == 'xml':
-        XmlConverter(data).save()
+    converter.get_serializer(format, data).save()
 
 
 def main():
