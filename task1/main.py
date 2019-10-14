@@ -95,9 +95,7 @@ class Action:
             d[s['room']].append(s['id'])
 
         for r in self.rooms:
-            for k in d:
-                if r['id'] == k:
-                    r['students'] = d[k]
+            r['students'] = d[r['id']]
 
         return self.rooms
 
@@ -105,7 +103,7 @@ class Action:
 class ConverterFactory:
     """Factory class for defining output format"""
 
-    def get_serializer(self, format, data):
+    def get_serializer(self, format: str, data: list):
         if format == 'json':
             return JsonConverter(data)
         elif format == 'xml':
@@ -114,7 +112,7 @@ class ConverterFactory:
             raise ValueError(format)
 
 
-def make(stud_path, rooms_path, format):
+def make(stud_path: str, rooms_path: str, format: str):
     converter = ConverterFactory()
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
@@ -124,6 +122,7 @@ def make(stud_path, rooms_path, format):
 
 def main():
     """Run a script to process data."""
+
     parser = argparse.ArgumentParser(description='Merging rooms and students')
     parser.add_argument('student_dir', type=str, help='Students file path.')
     parser.add_argument('room_dir', type=str, help='Rooms file path')
