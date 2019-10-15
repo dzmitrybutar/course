@@ -31,18 +31,18 @@ class Version:
         return vlist
 
     def __eq__(self, other):
-        a = self.cmp(other)
+        a = self.__cmp(other)
         if a is NotImplemented:
             return a
         return a == 0
 
     def __lt__(self, other):
-        a = self.cmp(other)
+        a = self.__cmp(other)
         if a is NotImplemented:
             return a
         return a < 0
 
-    def cmp(self, other):
+    def __cmp(self, other):
         if isinstance(other, str):
             other = Version(other)
         if self.num_list != other.num_list:
