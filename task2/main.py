@@ -1,37 +1,34 @@
-import re
 import functools
 
 
 @functools.total_ordering
 class Version:
     def __init__(self, version):
-        self.__call__(version)
+        self.__parse(version)
 
-    expression = re.compile(
-        r'^(\d+)\.(\d+)(\.(\d+))?[-.]?([a-z]+)?(\d+)?[-.]?([a-z]+)?(\d+)?$')
-
-    def __call__(self, version):
-        result = self.expression.match(version)
-
-        if not result:
-            raise ValueError("Invalid version '%s'" % version)
-
-        self.num_list = list(result.group(1, 2, 4))
-        if not result.group(4):
-            self.num_list[2] = '0'
-        self.num_list = list(map(int, self.num_list))
-
-        self.pre_list = list(result.group(5, 6, 7, 8))
-        if not self.pre_list == [None] * len(self.pre_list):
-            for i, obj in enumerate(self.pre_list):
-                try:
-                    self.pre_list[i] = int(obj)
-                except TypeError:
-                    del self.pre_list[i]
-                except ValueError:
-                    pass
+    def __parse(self, version):
+        vstring = version.replace('-', '.')
+        if not vstring.replace('.', '').isdigit():
+            for i, c in enumerate(vstring):
+                if c.isalpha():
+                    self.num_list = self.__str_digits_to_int(
+                        vstring[:i].strip('.').split('.'))
+                    self.pre_list = self.__str_digits_to_int(
+                        vstring[i:].strip('.').split('.'))
+                    break
         else:
+            self.num_list = self.__str_digits_to_int(vstring.split('.'))
             self.pre_list = None
+
+        if len(self.num_list) == 2:
+            self.num_list += [0]
+
+    @staticmethod
+    def __str_digits_to_int(vlist):
+        for i in range(len(vlist)):
+            if vlist[i].isdigit():
+                vlist[i] = int(vlist[i])
+        return vlist
 
     def __eq__(self, other):
         a = self.cmp(other)
@@ -76,7 +73,10 @@ def main():
         ('1.1.0-alpha', '1.1.0-beta'),
         ('1.0.1b', '1.0.10-alpha.beta'),
         ('1.0.0-rc.1', '1.0.0'),
-        ('1.22.3b1', '1.22.3-rc1.2')
+        ('1.22.3b.1', '1.22.3-rc.1'),
+        ('1.1.23b', '1.2'),
+        ('1.2.0alpha', '1.2'),
+        ('1.1.1alpha', '1.1.1-alpha1')
     ]
 
     for version_1, version_2 in to_test:
