@@ -41,17 +41,15 @@ class Connection:
 
 
 class Database(Connection):
-    """Class for working with database"""
+    """Class for working with the database"""
 
-    def insert(self, data: list, table: str):
+    def insert(self, data: list, fields: list, table: str):
         """Writing data to the database"""
 
         try:
-            keys, values = zip(*data[0].items())
-            list_arg = [tuple(d[k] for k in keys) for d in data]
             query = "INSERT IGNORE INTO {} ({}) values ({})".format(
-                table, ",".join(keys), ",".join(['%s'] * len(keys)))
-            self.cursor.executemany(query, list_arg)
+                table, ",".join(fields), ",".join(['%s'] * len(fields)))
+            self.cursor.executemany(query, data)
             self.connection.commit()
 
         except Error as error:
@@ -102,16 +100,16 @@ class JsonLoader(Loader):
 class Converter:
     """Base class for data conversion."""
 
-    def __init__(self, data: list, out_name: str, format: str):
+    def __init__(self, data: list, out_name: str, mode: str):
         self.data = data
         self.out_name = out_name
-        self.format = format
+        self.mode = mode
 
     def get_name(self):
         if not os.path.exists('output_data'):
             os.makedirs('output_data')
         path = os.path.abspath('output_data')
-        name = '{}/{}.{}'.format(path, self.out_name, self.format)
+        name = '{}/{}.{}'.format(path, self.out_name, self.mode)
         return name
 
     def save(self):
@@ -145,19 +143,37 @@ class XmlConverter(Converter):
         tree.write(output_dir, xml_declaration=True)
 
 
+class Process:
+    """Class for processing raw data."""
+
+    def __init__(self, raw_data: list):
+        self.raw_data = raw_data
+
+    def process_for_insert(self):
+        """Returns a list of fields and a list of records in a tuple"""
+
+        fields = list(self.raw_data[0].keys())
+        data = [tuple(d[f] for f in fields) for d in self.raw_data]
+
+        return data, fields
+
+
 class ConverterFactory:
     """Factory class for defining output format"""
 
-    def get_serializer(self, format: str, data: list, out_name: str):
-        if format == 'json':
-            return JsonConverter(data, out_name, format)
-        elif format == 'xml':
-            return XmlConverter(data, out_name, format)
+    def __init__(self, mode: str):
+        self.mode = mode
+
+    def get_serializer(self, data: list, out_name: str):
+        if self.mode == 'json':
+            return JsonConverter(data, out_name, self.mode)
+        elif self.mode == 'xml':
+            return XmlConverter(data, out_name, self.mode)
         else:
-            raise ValueError(format)
+            raise ValueError(self.mode)
 
 
-def make(stud_path: str, rooms_path: str, format: str):
+def make(stud_path: str, rooms_path: str, mode: str):
 
     queries = dict(
         rooms_stud_count="SELECT rooms.name, COUNT(students.room) AS count_st "
@@ -179,15 +195,17 @@ def make(stud_path: str, rooms_path: str, format: str):
                      "HAVING COUNT(DISTINCT students.sex) in (2)"
     )
 
-    converter = ConverterFactory()
+    converter = ConverterFactory(mode)
+    database = Database()
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
-    database = Database()
-    database.insert(rooms, 'rooms')
-    database.insert(students, 'students')
-    for k, v in queries.items():
-        data = database.select(v)
-        converter.get_serializer(format, data, k).save()
+    stud_data, stud_fields = Process(rooms).process_for_insert()
+    room_data, room_fields = Process(students).process_for_insert()
+    database.insert(stud_data, stud_fields, 'rooms')
+    database.insert(room_data, room_fields, 'students')
+    for keys, values in queries.items():
+        data = database.select(values)
+        converter.get_serializer(data, keys).save()
 
 
 def main():
