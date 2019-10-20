@@ -102,15 +102,17 @@ class JsonLoader(Loader):
 class Converter:
     """Base class for data conversion."""
 
-    def __init__(self, data: list, out_name: str):
+    def __init__(self, data: list, out_name: str, format: str):
         self.data = data
         self.out_name = out_name
+        self.format = format
 
-    def create_folder(self):
+    def get_name(self):
         if not os.path.exists('output_data'):
             os.makedirs('output_data')
-        path = os.path.abspath('output_data') + '/' + self.out_name
-        return path
+        path = os.path.abspath('output_data')
+        name = '{}/{}.{}'.format(path, self.out_name, self.format)
+        return name
 
     def save(self):
         raise NotImplementedError
@@ -120,7 +122,7 @@ class JsonConverter(Converter):
     """Class for outputting data in JSON format."""
 
     def save(self):
-        output_dir = self.create_folder() + '.json'
+        output_dir = self.get_name()
 
         with open(output_dir, 'w') as f:
             json.dump(self.data, f, sort_keys=True,
@@ -131,7 +133,7 @@ class XmlConverter(Converter):
     """Class for outputting data in XML format."""
 
     def save(self):
-        output_dir = self.create_folder() + '.xml'
+        output_dir = self.get_name()
         result = ET.Element("result")
 
         for raw_d in self.data:
@@ -148,9 +150,9 @@ class ConverterFactory:
 
     def get_serializer(self, format: str, data: list, out_name: str):
         if format == 'json':
-            return JsonConverter(data, out_name)
+            return JsonConverter(data, out_name, format)
         elif format == 'xml':
-            return XmlConverter(data, out_name)
+            return XmlConverter(data, out_name, format)
         else:
             raise ValueError(format)
 
