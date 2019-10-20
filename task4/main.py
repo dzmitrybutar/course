@@ -27,13 +27,21 @@ def read_db_config(filename='config.ini', section='mysql'):
     return db
 
 
-class DataBase:
-    """Class for working with MySQL database"""
+class Connection:
+    """Class to connect to the database"""
 
     def __init__(self):
         db_config = read_db_config()
         self.connection = MySQLConnection(**db_config)
         self.cursor = self.connection.cursor()
+
+    def __del__(self):
+        self.cursor.close()
+        self.connection.close()
+
+
+class Database(Connection):
+    """Class for working with database"""
 
     def insert(self, data: list, table: str):
         """Writing data to the database"""
@@ -49,7 +57,6 @@ class DataBase:
         except Error as error:
             print("Failed to insert into MySQL table {}".format(error))
 
-
     def select(self, query: str):
         """Database query for data"""
 
@@ -60,10 +67,6 @@ class DataBase:
 
         except Error as error:
             print("Failed to select into MySQL table {}".format(error))
-
-    def __del__(self):
-        self.cursor.close()
-        self.connection.close()
 
 
 class Loader:
@@ -177,7 +180,7 @@ def make(stud_path: str, rooms_path: str, format: str):
     converter = ConverterFactory()
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
-    database = DataBase()
+    database = Database()
     database.insert(rooms, 'rooms')
     database.insert(students, 'students')
     for k, v in queries.items():
