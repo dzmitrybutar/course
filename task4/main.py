@@ -6,10 +6,6 @@ from configparser import ConfigParser
 from mysql.connector import MySQLConnection, Error
 
 
-class ValidationError(Exception):
-    pass
-
-
 def read_db_config(filename='config.ini', section='mysql'):
     """ Read database configuration file and return a dictionary object"""
 
@@ -78,11 +74,11 @@ class Loader:
 
     def check_existence(self):
         if not os.path.exists(self.path):
-            raise ValidationError('{} not exist!'.format(self.path))
+            raise FileExistsError('{} not exist!'.format(self.path))
 
     def check_file_format(self, file_type):
         if not self.path.split('.')[-1] == file_type:
-            raise ValidationError('Wrong file format!')
+            raise FileNotFoundError('Wrong file format!')
 
 
 class JsonLoader(Loader):
@@ -177,7 +173,7 @@ def make(stud_path: str, rooms_path: str, mode: str):
 
     queries = dict(
         rooms_stud_count="SELECT rooms.name, COUNT(students.room) AS count_st "
-                         "FROM rooms JOIN students ON rooms.id = students.room "
+                         "FROM rooms LEFT JOIN students ON rooms.id = students.room "
                          "GROUP BY rooms.id",
         max_avg_old="SELECT rooms.name "
                     "FROM rooms JOIN students ON rooms.id = students.room "
