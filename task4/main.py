@@ -7,7 +7,7 @@ from mysql.connector import MySQLConnection, Error
 
 
 def read_db_config(filename='config.ini', section='mysql'):
-    """ Read database configuration file and return a dictionary object"""
+    """ Read database configuration file and return a dictionary object."""
 
     parser = ConfigParser()
     parser.read(filename)
@@ -24,7 +24,7 @@ def read_db_config(filename='config.ini', section='mysql'):
 
 
 class Connection:
-    """Class to connect to the database"""
+    """Class to connect to the database."""
 
     def __init__(self):
         db_config = read_db_config()
@@ -37,7 +37,7 @@ class Connection:
 
 
 class Database(Connection):
-    """Class for working with the database"""
+    """Class for working with the database."""
 
     def insert(self, data: list, fields: list, table: str):
         """Writing data to the database"""
@@ -52,7 +52,7 @@ class Database(Connection):
             print("Failed to insert into MySQL table {}".format(error))
 
     def select(self, query: str):
-        """Database query for data"""
+        """Database query for data."""
 
         try:
             self.cursor.execute(query)
@@ -146,7 +146,7 @@ class Process:
         self.raw_data = raw_data
 
     def process_for_insert(self):
-        """Returns a list of fields and a list of records in a tuple"""
+        """Returns a list of fields and a list of records in a tuple."""
 
         fields = list(self.raw_data[0].keys())
         data = [tuple(d[f] for f in fields) for d in self.raw_data]
@@ -155,7 +155,7 @@ class Process:
 
 
 class ConverterFactory:
-    """Factory class for defining output format"""
+    """Factory class for defining output format."""
 
     def __init__(self, mode: str):
         self.mode = mode
@@ -169,7 +169,8 @@ class ConverterFactory:
             raise ValueError(self.mode)
 
 
-def make(stud_path: str, rooms_path: str, mode: str):
+def execute_queries(mode: str):
+    """Makes queries to the database and writes the received data in the required format."""
 
     queries = dict(
         rooms_stud_count="SELECT rooms.name, COUNT(students.room) AS count_st "
@@ -191,17 +192,23 @@ def make(stud_path: str, rooms_path: str, mode: str):
                      "HAVING COUNT(DISTINCT students.sex) in (2)"
     )
 
-    converter = ConverterFactory(mode)
     database = Database()
+    converter = ConverterFactory(mode)
+    for keys, values in queries.items():
+        data = database.select(values)
+        converter.get_serializer(data, keys).save()
+
+
+def make(stud_path: str, rooms_path: str, mode: str):
+
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
     stud_data, stud_fields = Process(rooms).process_for_insert()
     room_data, room_fields = Process(students).process_for_insert()
+    database = Database()
     database.insert(stud_data, stud_fields, 'rooms')
     database.insert(room_data, room_fields, 'students')
-    for keys, values in queries.items():
-        data = database.select(values)
-        converter.get_serializer(data, keys).save()
+    execute_queries(mode)
 
 
 def main():
