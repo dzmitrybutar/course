@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `mydb`.`students` (
   `sex` CHAR(1) NOT NULL,
   `birthday` DATETIME NOT NULL,
   PRIMARY KEY (`id`),
-  INDEX `fk_students_1_idx` (`room` ASC),
+  INDEX `students_1_idx` (`room` ASC),
   CONSTRAINT `fk_students`
     FOREIGN KEY (`room`)
     REFERENCES `mydb`.`rooms` (`id`)
