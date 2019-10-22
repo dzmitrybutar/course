@@ -26,28 +26,34 @@ def read_db_config(config_path, section='mysql'):
 class Connection:
     """Class to connect to the database."""
 
-    def __init__(self, config_path):
-        self.config_path = config_path
-        db_config = read_db_config(config_path)
+    def __init__(self, db_config: dict):
+
         self.connection = MySQLConnection(**db_config)
         self.cursor = self.connection.cursor()
 
-    def __del__(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.cursor.close()
         self.connection.close()
 
 
-class Database(Connection):
+class ExecutorDB:
     """Class for working with the database."""
+
+    def __init__(self, config_path: str):
+        self.db_config = read_db_config(config_path)
 
     def insert(self, data: list, fields: list, table: str):
         """Writing data to the database"""
 
         try:
-            query = "INSERT IGNORE INTO {} ({}) values ({})".format(
-                table, ",".join(fields), ",".join(['%s'] * len(fields)))
-            self.cursor.executemany(query, data)
-            self.connection.commit()
+            with Connection(self.db_config) as db:
+                query = "INSERT IGNORE INTO {} ({}) values ({})".format(
+                    table, ",".join(fields), ",".join(['%s'] * len(fields)))
+                db.cursor.executemany(query, data)
+                db.connection.commit()
 
         except Error as error:
             print("Failed to insert into MySQL table {}".format(error))
@@ -56,9 +62,10 @@ class Database(Connection):
         """Database query for data."""
 
         try:
-            self.cursor.execute(query)
-            records = self.cursor.fetchall()
-            return records
+            with Connection(self.db_config) as db:
+                db.cursor.execute(query)
+                records = db.cursor.fetchall()
+                return records
 
         except Error as error:
             print("Failed to select into MySQL table {}".format(error))
@@ -194,7 +201,7 @@ def execute_queries(mode: str, config_path: str):
                      "HAVING COUNT(DISTINCT students.sex) > 1"
     )
 
-    database = Database(config_path)
+    database = ExecutorDB(config_path)
     converter = ConverterFactory(mode)
     for keys, values in queries.items():
         data = database.select(values)
@@ -207,7 +214,7 @@ def make(stud_path: str, rooms_path: str, config_path: str, mode: str):
     rooms = JsonLoader(rooms_path).load()
     stud_data, stud_fields = Process(rooms).process_for_insert()
     room_data, room_fields = Process(students).process_for_insert()
-    database = Database(config_path)
+    database = ExecutorDB(config_path)
     database.insert(stud_data, stud_fields, 'rooms')
     database.insert(room_data, room_fields, 'students')
     execute_queries(mode, config_path)
