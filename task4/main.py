@@ -6,11 +6,11 @@ from configparser import ConfigParser
 from mysql.connector import MySQLConnection, Error
 
 
-def read_db_config(filename='config.ini', section='mysql'):
+def read_db_config(config_path, section='mysql'):
     """ Read database configuration file and return a dictionary object."""
 
     parser = ConfigParser()
-    parser.read(filename)
+    parser.read(config_path)
     db = {}
 
     if parser.has_section(section):
@@ -18,7 +18,7 @@ def read_db_config(filename='config.ini', section='mysql'):
         for item in items:
             db[item[0]] = item[1]
     else:
-        raise Error('{0} not found in the {1} file'.format(section, filename))
+        raise Error('{} not found in the {} file'.format(section, config_path))
 
     return db
 
@@ -26,8 +26,9 @@ def read_db_config(filename='config.ini', section='mysql'):
 class Connection:
     """Class to connect to the database."""
 
-    def __init__(self):
-        db_config = read_db_config()
+    def __init__(self, config_path):
+        self.config_path = config_path
+        db_config = read_db_config(config_path)
         self.connection = MySQLConnection(**db_config)
         self.cursor = self.connection.cursor()
 
@@ -102,10 +103,11 @@ class Converter:
         self.mode = mode
 
     def get_name(self):
-        if not os.path.exists('output_data'):
-            os.makedirs('output_data')
-        path = os.path.abspath('output_data')
-        name = '{}/{}.{}'.format(path, self.out_name, self.mode)
+        path = 'output_data_' + self.mode
+        if not os.path.exists(path):
+            os.makedirs(path)
+        out_path = os.path.abspath(path)
+        name = '{}/{}.{}'.format(out_path, self.out_name, self.mode)
         return name
 
     def save(self):
@@ -169,17 +171,17 @@ class ConverterFactory:
             raise ValueError(self.mode)
 
 
-def execute_queries(mode: str):
+def execute_queries(mode: str, config_path: str):
     """Makes queries to the database and writes the received data in the required format."""
 
     queries = dict(
         rooms_stud_count="SELECT rooms.name, COUNT(students.room) AS count_st "
                          "FROM rooms LEFT JOIN students ON rooms.id = students.room "
                          "GROUP BY rooms.id",
-        max_avg_old="SELECT rooms.name "
+        min_avg_old="SELECT rooms.name "
                     "FROM rooms JOIN students ON rooms.id = students.room "
                     "GROUP BY rooms.id "
-                    "ORDER BY AVG(students.birthday) DESC "
+                    "ORDER BY AVG(students.birthday) ASC "
                     "LIMIT 5",
         max_diff_old="SELECT rooms.name "
                      "FROM rooms JOIN students ON rooms.id = students.room "
@@ -189,26 +191,26 @@ def execute_queries(mode: str):
         room_two_sex="SELECT rooms.name "
                      "FROM rooms JOIN students ON rooms.id = students.room "
                      "GROUP BY rooms.id "
-                     "HAVING COUNT(DISTINCT students.sex) in (2)"
+                     "HAVING COUNT(DISTINCT students.sex) > 1"
     )
 
-    database = Database()
+    database = Database(config_path)
     converter = ConverterFactory(mode)
     for keys, values in queries.items():
         data = database.select(values)
         converter.get_serializer(data, keys).save()
 
 
-def make(stud_path: str, rooms_path: str, mode: str):
+def make(stud_path: str, rooms_path: str, config_path: str, mode: str):
 
     students = JsonLoader(stud_path).load()
     rooms = JsonLoader(rooms_path).load()
     stud_data, stud_fields = Process(rooms).process_for_insert()
     room_data, room_fields = Process(students).process_for_insert()
-    database = Database()
+    database = Database(config_path)
     database.insert(stud_data, stud_fields, 'rooms')
     database.insert(room_data, room_fields, 'students')
-    execute_queries(mode)
+    execute_queries(mode, config_path)
 
 
 def main():
@@ -217,12 +219,10 @@ def main():
     parser = argparse.ArgumentParser(description='Merging rooms and students')
     parser.add_argument('student_dir', type=str, help='Students file path.')
     parser.add_argument('room_dir', type=str, help='Rooms file path')
+    parser.add_argument('config_dir', type=str, help='Config file path')
     parser.add_argument('format', choices=['json', 'xml'], help='The output format.')
     args = parser.parse_args()
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    stud_path = basedir + '/' + args.student_dir
-    rooms_path = basedir + '/' + args.room_dir
-    make(stud_path, rooms_path, args.format)
+    make(args.student_dir, args.room_dir, args.config_dir, args.format)
 
 
 if __name__ == "__main__":
