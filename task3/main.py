@@ -1,20 +1,23 @@
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+
+a = 0
 
 
-def function(arg):
-    b = 0
+def function(lock, arg):
+    global a
     for _ in range(arg):
-        b += 1
-    return b
+        with lock:
+            a += 1
 
 
 def main():
-    a = 0
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = [executor.submit(function, 10000000) for _ in range(5)]
-        for c in concurrent.futures.as_completed(results):
-            a += c.result()
+    lock = Lock()
+    with ThreadPoolExecutor() as executor:
+        for _ in range(5):
+            executor.submit(function, lock, 1000000)
     print("----------------------", a)
 
 
-main()
+if __name__ == '__main__':
+    main()
